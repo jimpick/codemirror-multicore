@@ -1,0 +1,34 @@
+{
+  "name": "pp-mini-web",
+  "version": "0.0.1",
+  "description": "Experiment with hypercore and websockets",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "browserify-middleware": "^8.0.0",
+    "express": "^4.16.2",
+    "choo": "^6.8.0",
+    "choo-devtools": "^2.3.3",
+    "express-ws": "^3.0.0",
+    "hypercore": "^6.12.2",
+    "hypercore-archiver": "^4.4.1",
+    "random-access-memory": "^2.4.0",
+    "websocket-stream": "^5.1.1",
+    "babel-core": "^6.26.0",
+    "babelify": "^8.0.0",
+    "immutable": "^3.8.2",
+    "transit-immutable-js": "^0.7.0",
+    "transit-js": "^0.8.846",
+    "uuid": "^3.2.1",
+    "random-access-idb": "^1.0.4",
+    "codemirror": "^5.35.0",
+    "sheetify": "^7.2.0",
+    "hyperdrive": "^9.12.3"
+  },
+  "engines": {
+    "node": "9.x"
+  },
+  "license": "MIT"
+}
