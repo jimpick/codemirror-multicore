@@ -10,6 +10,8 @@ const toBuffer = require('to-buffer')
 const hypercore = require('hypercore')
 const Multicore = require('./script/multicore')
 
+require('events').prototype._maxListeners = 100
+
 const app = express()
 
 app.use('/js', browserify(__dirname + '/script', {
@@ -51,6 +53,7 @@ app.ws('/archiver/:key', (ws, req) => {
       // Join swarm
       const sw = multicore.joinSwarm()
       sw.on('connection', (peer, type) => {
+        /*
         try {
           if (!peer.remoteUserData) throw new Error('No user data')
           const userData = JSON.parse(peer.remoteUserData.toString())
@@ -64,6 +67,7 @@ app.ws('/archiver/:key', (ws, req) => {
           console.log(`Connection with no or invalid user data`, e)
           // console.error('Error parsing JSON', e)
         }
+        */
       })
     })
   }
@@ -73,13 +77,13 @@ app.ws('/archiver/:key', (ws, req) => {
     pump(
       stream,
       through2(function (chunk, enc, cb) {
-        console.log('From web', chunk)
+        // console.log('From web', chunk)
         this.push(chunk)
         cb()
       }),
       ar.replicate({encrypt: false}),
       through2(function (chunk, enc, cb) {
-        console.log('To web', chunk)
+        // console.log('To web', chunk)
         this.push(chunk)
         cb()
       }),
