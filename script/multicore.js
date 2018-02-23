@@ -36,20 +36,6 @@ Archiver.prototype.createFeed = function (key, opts) {
 
   this.changes.append({type: 'add', key: key.toString('hex')})
 
-  feed.on('peer-add', peer => {
-    console.log('Jim peer-add', peer)
-    peer.stream.on('extension', (type, message) => {
-      console.log('Jim received extension message')
-      if (type === 'announceActor') {
-        try {
-          self.emit('announceActor', JSON.parse(message.toString()))
-        } catch (e) {
-          self.emit('error', e)
-        }
-      }
-    })
-  })
-
   return feed
 
   // copied from hypercore-archiver.prototype._add()
@@ -82,26 +68,12 @@ Archiver.prototype.createArchive = function (key, opts) {
   }
 
   opts.sparse = this.sparse
-  const feed = hyperdrive(storage(key), key, opts)
-  this.feeds[dk] = feed
+  const archive = hyperdrive(storage(key), key, opts)
+  this.archives[dk] = archive
 
   this.changes.append({type: 'add', key: key.toString('hex')})
 
-  feed.on('peer-add', peer => {
-    console.log('Jim peer-add', peer)
-    peer.stream.on('extension', (type, message) => {
-      console.log('Jim received extension message')
-      if (type === 'announceActor') {
-        try {
-          self.emit('announceActor', JSON.parse(message.toString()))
-        } catch (e) {
-          self.emit('error', e)
-        }
-      }
-    })
-  })
-
-  return feed
+  return archive
 
   // copied from hypercore-archiver.prototype._add()
   function storage (key) {
@@ -124,8 +96,7 @@ Archiver.prototype.replicate = function (opts) {
   const protocolOpts = {
     live: true,
     id: this.changes.id,
-    encrypt: opts.encrypt,
-    extensions: ['announceActor']
+    encrypt: opts.encrypt
   }
   if (opts.userData) {
     protocolOpts.userData = opts.userData
@@ -139,16 +110,6 @@ Archiver.prototype.replicate = function (opts) {
 
   this.on('replicateFeed', feed => {
     add(feed.discoveryKey)
-  })
-
-  this.on('sendAnnounceActor', message => {
-    // console.log('Jim sendAnnounceActor', stream)
-    console.log('Jim sendAnnounceActor')
-    for (let feed of stream.feeds) {
-      if (feed.remoteSupports('announceActor')) {
-        feed.extension('announceActor', message)
-      }
-    }
   })
 
   function add (dk) {
@@ -212,10 +173,6 @@ Archiver.prototype.replicate = function (opts) {
   return stream
 }
 
-Archiver.prototype.announceActor = function (name, key) {
-  this.emit('sendAnnounceActor', Buffer.from(JSON.stringify({name, key})))
-}
-
 class Multicore extends EventEmitter {
   constructor (storage, opts) {
     super()
@@ -224,29 +181,9 @@ class Multicore extends EventEmitter {
     this.ready = thunky(open)
     const self = this
 
-    self.archiver.on('announceActor', message => {
-      self.emit('announceActor', message)
-    })
-
     function open (cb) {
       self.opened = true
       self.archiver.on('ready', () => {
-        Object.keys(self.archiver.feeds).forEach(key => {
-          const feed = self.archiver.feeds[key]
-          feed.on('peer-add', peer => {
-            console.log('Jim peer-add', peer)
-            peer.stream.on('extension', (type, message) => {
-              console.log('Jim received extension message')
-              if (type === 'announceActor') {
-                try {
-                  self.emit('announceActor', JSON.parse(message.toString()))
-                } catch (e) {
-                  self.emit('error', e)
-                }
-              }
-            })
-          })
-        })
         self.emit('ready')
         cb()
       })
@@ -284,10 +221,6 @@ class Multicore extends EventEmitter {
 
   replicateFeed (feed) {
     this.archiver.emit('replicateFeed', feed)
-  }
-
-  announceActor (name, key) {
-    this.archiver.announceActor(name, key)
   }
 }
 

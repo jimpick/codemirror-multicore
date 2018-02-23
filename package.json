@@ -25,7 +25,9 @@
     "random-access-idb": "^1.0.4",
     "codemirror": "^5.35.0",
     "sheetify": "^7.2.0",
-    "hyperdrive": "^9.12.3"
+    "hyperdrive": "^9.12.3",
+    "pretty-hash": "^1.0.1",
+    "nanocomponent": "^6.5.1"
   },
   "engines": {
     "node": "9.x"
