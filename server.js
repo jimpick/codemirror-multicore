@@ -26,10 +26,9 @@ router.get('/page/:key', (req, res, next) => {
 
 const multicores = {}
 
-attachWebsocket(null)
-
 function attachWebsocket (server) {
-  expressWebSocket(app, server, {
+  console.log('Attaching websocket')
+  expressWebSocket(router, server, {
     perMessageDeflate: false
   })
 
@@ -103,7 +102,7 @@ function attachWebsocket (server) {
 }
 
 const port = process.env.PORT || 5000
-const server = budo('index.js', {
+const devServer = budo('index.js', {
   port,
   browserify: {
     transform: [ brfs, sheetify ]
@@ -112,8 +111,9 @@ const server = budo('index.js', {
     router
   ]
 })
-server.on('connect', event => {
+devServer.on('connect', event => {
   console.log('Listening on', event.uri)
+  attachWebsocket(event.server)
 })
 
 
