@@ -4,27 +4,43 @@ module.exports = `<html>
   <style>
     body {
       font-family: monospace;
-      color: white;
-      background: black;
+      margin: 0;
     }
-    a {
+    header {
+      background: #80c683;
+      padding: 1em;
+    }
+    header h1 {
+      margin: 0;
+    }
+    .content {
+      font-size: x-large;
+      margin: 1.5em;
+    }
+    footer a {
       color: yellow;
     }
     footer {
       position: fixed;
       bottom: 0;
+      left: 0;
+      right: 0;
       padding: 0.3em;
+      background: #509556;
+      color: white;
     }
   </style>
 </head>
 <body>
-  <h1>My Dat Page</h1>
+  <header>
+    <h1>My Dat Page</h1>
+  </header>
 
-  <pre>
-  This is my page published as a Dat archive.
-
-  Fun times!
-  </pre>
+  <div class="content">
+    This is my page published as a Dat archive.<br>
+    <br>
+    Fun times! &#x1f389;
+  </div>
 
   <footer>
     Published to the peer-to-peer web from the

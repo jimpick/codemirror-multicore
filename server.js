@@ -17,6 +17,7 @@ const app = express()
 app.use('/js', browserify(__dirname + '/script', {
   transform: ['sheetify']
 }))
+app.get('/page/:key', (_, res) => res.sendFile(`${__dirname}/public/index.html`))
 app.use(express.static(__dirname + '/public'))
 
 expressWebSocket(app, null, {

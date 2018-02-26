@@ -101,7 +101,6 @@ Archiver.prototype.replicate = function (opts) {
   if (opts.userData) {
     protocolOpts.userData = opts.userData
   }
-  console.log('Jim replicate', protocolOpts)
   var stream = protocol(protocolOpts)
   var self = this
 
@@ -114,7 +113,7 @@ Archiver.prototype.replicate = function (opts) {
 
   function add (dk) {
     self.ready(function (err) {
-      console.log('Add dk', dk.toString('hex'))
+      // console.log('Add dk', dk.toString('hex'))
       if (err) return stream.destroy(err)
       if (stream.destroyed) return
 
@@ -139,8 +138,8 @@ Archiver.prototype.replicate = function (opts) {
       }
 
       function onfeed () {
-        console.log('Jim onfeed', prettyHash(feed.key),
-                    'dk:', prettyHash(feed.discoveryKey))
+        // console.log('Jim onfeed', prettyHash(feed.key),
+        //             'dk:', prettyHash(feed.discoveryKey))
         if (stream.destroyed) return
 
         stream.on('close', onclose)
@@ -151,7 +150,7 @@ Archiver.prototype.replicate = function (opts) {
           stream: stream,
           live: true
         })
-        console.log('Jim feed peers', feed.peers && feed.peers.length)
+        // console.log('Jim feed peers', feed.peers && feed.peers.length)
 
         function onclose () {
           feed.removeListener('_archive', onarchive)
