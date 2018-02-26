@@ -8,11 +8,14 @@ const prettyHash = require('pretty-hash')
 const toBuffer = require('to-buffer')
 const hyperdrive = require('hyperdrive')
 const hypercore = require('hypercore')
+// const css = require('sheetify')
 const Editor = require('./editor')
 const Multicore = require('./multicore')
 const template = require('./template')
 
 require('events').prototype._maxListeners = 100
+
+// css('./index.css')
 
 const app = choo()
 app.use(devtools())
@@ -81,7 +84,11 @@ function store (state, emitter) {
   state.indexHtml = ''
   state.title = ''
 
-  const multicore = new Multicore(storage)
+  function debugStorage (name) {
+    console.log('debugStorage:', name)
+    return storage(name)
+  }
+  const multicore = new Multicore(debugStorage)
   multicore.ready(() => {
     const archiverKey = multicore.archiver.changes.key.toString('hex')
 
@@ -129,7 +136,8 @@ function store (state, emitter) {
     })
     
     const host = document.location.host
-    const url = `wss://${host}/archiver/${archiverKey}`
+    // const url = `wss://${host}/archiver/${archiverKey}`
+    const url = `ws://${host}/archiver/${archiverKey}`
     const stream = websocket(url)
     pump(
       stream,
