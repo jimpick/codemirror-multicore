@@ -27,7 +27,8 @@
     "sheetify": "^7.2.0",
     "hyperdrive": "^9.12.3",
     "pretty-hash": "^1.0.1",
-    "nanocomponent": "^6.5.1"
+    "nanocomponent": "^6.5.1",
+    "to-buffer": "^1.1.0"
   },
   "engines": {
     "node": "9.x"
