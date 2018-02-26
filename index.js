@@ -8,14 +8,11 @@ const prettyHash = require('pretty-hash')
 const toBuffer = require('to-buffer')
 const hyperdrive = require('hyperdrive')
 const hypercore = require('hypercore')
-// const css = require('sheetify')
 const Editor = require('./editor')
 const Multicore = require('./multicore')
 const template = require('./template')
 
 require('events').prototype._maxListeners = 100
-
-// css('./index.css')
 
 const app = choo()
 app.use(devtools())
@@ -28,8 +25,8 @@ const editor = new Editor()
 
 function mainView (state, emit) {
   let link = html`<span class="help">Edit the HTML below, then click on "Publish" to create a new web site!</span>`
-  if (state.currentArchive && state.currentArchive.metadata.key) {
-    const url = `dat://${state.currentArchive.metadata.key.toString('hex')}`
+  if (state.currentArchive && state.currentArchive.key) {
+    const url = `dat://${state.currentArchive.key.toString('hex')}`
     link = html`<a href=${url}>${url}</a>`
   }
   const optionList = Object.keys(state.archives).sort().map(key => {
@@ -98,11 +95,11 @@ function store (state, emitter) {
       console.log('Archiver key:', archiverKey)
       const value = editor.codemirror.getValue()
       archive.ready(() => {
-        const key = archive.metadata.key.toString('hex')
+        const key = archive.key.toString('hex')
         console.log('Key:', key)
         console.log('Secret Key:', archive.metadata.secretKey)
         setTimeout(() => {
-          readSecretKey(archive.metadata.discoveryKey.toString('hex'), () => {
+          readSecretKey(archive.discoveryKey.toString('hex'), () => {
             console.log('Jim publish secretKey read')
           })
         }, 2000)
@@ -124,7 +121,7 @@ function store (state, emitter) {
             console.log('Success.')
             state.currentArchive = archive
             emitter.emit('pushState', `/page/${key}`)
-            multicore.replicateFeed(archive.metadata)
+            // multicore.replicateFeed(archive)
           })
         })
       })
@@ -239,8 +236,7 @@ function store (state, emitter) {
     }
     
     function readSecretKey (dk, cb) {
-      // const path = 'feeds/' + dk.slice(0, 2) + '/' + dk.slice(2, 4) + '/' + dk.slice(4) + '/secret_key'
-      const path = 'feeds/' + dk.slice(0, 2) + '/' + dk.slice(2, 4) + '/' + dk.slice(4) + '/metadata/secret_key'
+      const path = 'feeds/' + dk.slice(0, 2) + '/' + dk.slice(2, 4) + '/' + dk.slice(4) + '/secret_key'
       const privateKeyFile = storage(path)
       privateKeyFile.read(0, 64, (err, data) => {
         if (err) {

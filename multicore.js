@@ -4,6 +4,7 @@ var protocol = require('hypercore-protocol')
 const hypercore = require('hypercore')
 const hyperdrive = require('hyperdrive')
 const crypto = require('hypercore/lib/crypto')
+const sodium = require('sodium-universal')
 const thunky = require('thunky')
 const toBuffer = require('to-buffer')
 const prettyHash = require('pretty-hash')
@@ -51,12 +52,12 @@ Archiver.prototype.createFeed = function (key, opts) {
 
 Archiver.prototype.createArchive = function (key, opts) {
   const self = this
-  opts = opts || {}
+  const metadataOpts = opts || {}
   if (!key) {
     // create key pair
     const keyPair = crypto.keyPair()
     key = keyPair.publicKey
-    opts.secretKey = keyPair.secretKey
+    metadataOpts.secretKey = keyPair.secretKey
   }
   const dk = hypercore.discoveryKey(key).toString('hex')
 
@@ -67,11 +68,36 @@ Archiver.prototype.createArchive = function (key, opts) {
     return this.archives[dk]
   }
 
-  opts.sparse = this.sparse
-  const archive = hyperdrive(storage(key), key, opts)
-  this.archives[dk] = archive
+  // Create two hypercores for archive using hypercore-archiver
+  // file layout
+  const metadata = hypercore(storage(key), key, metadataOpts)
 
-  this.changes.append({type: 'add', key: key.toString('hex')})
+  /*
+  const contentKeys = contentKeyPair(metadataOpts.secretKey)
+  const contentOpts = {
+    secretKey: contentKeys.secretKey,
+    storeSecretKey: false
+  }
+  const content = hypercore(
+    storage(contentKeys.publicKey),
+    contentKeys.publicKey,
+    contentOpts
+  )
+  */
+
+  this.archives[dk] = {
+    metadataSynced: true,
+    metadata,
+    contentSynced: false
+  }
+
+  const archive = this.getHyperdrive(dk)
+  archive.ready(() => {
+    this.archives[dk].contentSynced = true
+    this.archives[dk].content = archive.content
+
+    this.changes.append({type: 'add', key: key.toString('hex')})
+  })
 
   return archive
 
@@ -83,6 +109,36 @@ Archiver.prototype.createArchive = function (key, opts) {
     return function (name) {
       return self.storage.feeds(prefix + name)
     }
+  }
+}
+
+Archiver.prototype.getHyperdrive = function (dk) {
+  if (!this.archives[dk]) return null
+  const self = this
+  const {metadata} = this.archives[dk]
+  const options = {
+    metadata,
+    sparse: true,
+    sparseMetadata: true
+  }
+  const contentKeys = contentKeyPair(metadata.secretKey)
+  const contentDk = hypercore.discoveryKey(contentKeys.publicKey)
+                      .toString('hex')
+  archive = new hyperdrive(storage, metadata.key, options)
+  return archive
+
+  function storage (name) {
+    console.log('Jim getHyperdrive', name)
+    const match = name.match(/^content\/(.*)$/)
+    let path
+    if (match) {
+      path = contentDk.slice(0, 2) + '/' + contentDk.slice(2, 4) + '/'
+        + contentDk.slice(4) + '/' + match[1]
+    } else {
+      throw new Error('Unexpected storage key')
+    }
+    console.log('Jim getHyperdrive2', path)
+    return self.storage.feeds(path)
   }
 }
 
@@ -221,6 +277,22 @@ class Multicore extends EventEmitter {
   replicateFeed (feed) {
     this.archiver.emit('replicateFeed', feed)
   }
+}
+
+// From hyperdrive
+function contentKeyPair (secretKey) {
+  var seed = new Buffer(sodium.crypto_sign_SEEDBYTES)
+  var context = new Buffer('hyperdri') // 8 byte context
+  var keyPair = {
+    publicKey: new Buffer(sodium.crypto_sign_PUBLICKEYBYTES),
+    secretKey: new Buffer(sodium.crypto_sign_SECRETKEYBYTES)
+  }
+
+  sodium.crypto_kdf_derive_from_key(seed, 1, context, secretKey)
+  sodium.crypto_sign_seed_keypair(keyPair.publicKey, keyPair.secretKey, seed)
+  if (seed.fill) seed.fill(0)
+
+  return keyPair
 }
 
 module.exports = Multicore
