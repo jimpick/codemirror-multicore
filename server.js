@@ -4,7 +4,6 @@ const expressWebSocket = require('express-ws')
 const websocketStream = require('websocket-stream/stream')
 const pump = require('pump')
 const through2 = require('through2')
-// const hypercore = require('hypercore')
 const ram = require('random-access-memory')
 const toBuffer = require('to-buffer')
 const hypercore = require('hypercore')
@@ -14,15 +13,12 @@ const Multicore = require('./multicore')
 
 require('events').prototype._maxListeners = 100
 
-const app = express()
 const router = express.Router()
 
-// router.get('/page/:key', (_, res) => res.sendFile(`${__dirname}/index.html`))
 router.get('/page/:key', (req, res, next) => {
   req.url = '/index.html'
   next()
 })
-// app.use(express.static(__dirname + '/public'))
 
 const multicores = {}
 
