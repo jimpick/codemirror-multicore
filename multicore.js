@@ -128,7 +128,6 @@ Archiver.prototype.getHyperdrive = function (dk) {
   return archive
 
   function storage (name) {
-    console.log('Jim getHyperdrive', name)
     const match = name.match(/^content\/(.*)$/)
     let path
     if (match) {
@@ -137,7 +136,6 @@ Archiver.prototype.getHyperdrive = function (dk) {
     } else {
       throw new Error('Unexpected storage key')
     }
-    console.log('Jim getHyperdrive2', path)
     return self.storage.feeds(path)
   }
 }
