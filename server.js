@@ -9,6 +9,7 @@ const toBuffer = require('to-buffer')
 const hypercore = require('hypercore')
 const sheetify = require('sheetify')
 const brfs = require('brfs')
+const prettyHash = require('pretty-hash')
 const Multicore = require('./multicore')
 
 require('events').prototype._maxListeners = 100
@@ -41,9 +42,36 @@ function attachWebsocket (server) {
       ar.on('add', feed => {
         console.log('archive add', feed.key.toString('hex'))
         multicore.replicateFeed(feed)
+        feed.on('append', () => {
+          console.log('append', prettyHash(feed.key), feed.length)
+        })
+        feed.on('sync', () => {
+          console.log('sync', prettyHash(feed.key), feed.length)
+        })
       })
-      ar.on('sync', () => {
-        console.log('archive sync')
+      ar.on('add-archive', (metadata, content) => {
+        console.log(
+          'archive add-archive',
+          metadata.key.toString('hex'),
+          content.key.toString('hex')
+        )
+        content.on('append', () => {
+          console.log(
+            'append content',
+            prettyHash(content.key),
+            content.length
+          )
+        })
+        content.on('sync', () => {
+          console.log(
+            'sync content',
+            prettyHash(content.key),
+            content.length
+          )
+        })
+      })
+      ar.on('sync', feed => {
+        console.log('archive fully synced', prettyHash(feed.key))
       })
       ar.on('ready', () => {
         console.log('archive ready', ar.changes.length)
@@ -55,22 +83,8 @@ function attachWebsocket (server) {
         })
         // Join swarm
         const sw = multicore.joinSwarm()
-        sw.on('connection', (peer, type) => {
-          /*
-          try {
-            if (!peer.remoteUserData) throw new Error('No user data')
-            const userData = JSON.parse(peer.remoteUserData.toString())
-            if (userData.key) {
-              console.log(`Connect ${userData.name} ${userData.key}`)
-              const dk = hypercore.discoveryKey(toBuffer(userData.key, 'hex'))
-              multicore.archiver.add(dk)
-              multicore.announceActor(userData.name, userData.key)
-            }
-          } catch (e) {
-            console.log(`Connection with no or invalid user data`, e)
-            // console.error('Error parsing JSON', e)
-          }
-          */
+        sw.on('connection', (peer, info) => {
+          console.log('Swarm connection', info)
         })
       })
     }
@@ -90,7 +104,14 @@ function attachWebsocket (server) {
           this.push(chunk)
           cb()
         }),
-        stream
+        stream,
+        err => {
+          console.log('pipe finished', err)
+        }
+      )
+      console.log(
+        'Changes feed dk:',
+        ar.changes.discoveryKey.toString('hex')
       )
       multicore.replicateFeed(ar.changes)
     })

@@ -1,12 +1,11 @@
 const html = require('choo/html')
-const devtools = require('choo-devtools')
+// const devtools = require('choo-devtools')
 const choo = require('choo')
 const storage = require('random-access-idb')('codemirror-multicore')
 const websocket = require('websocket-stream')
 const pump = require('pump')
 const prettyHash = require('pretty-hash')
 const toBuffer = require('to-buffer')
-const hyperdrive = require('hyperdrive')
 const hypercore = require('hypercore')
 const Editor = require('./editor')
 const Multicore = require('./multicore')
@@ -15,7 +14,7 @@ const template = require('./template')
 require('events').prototype._maxListeners = 100
 
 const app = choo()
-app.use(devtools())
+// app.use(devtools())
 app.use(store)
 app.route('/', mainView)
 app.route('/page/:key', mainView)
@@ -106,8 +105,6 @@ function store (state, emitter) {
       const value = editor.codemirror.getValue()
       archive.ready(() => {
         const key = archive.key.toString('hex')
-        console.log('Key:', key)
-        console.log('Secret Key:', archive.metadata.secretKey)
         const datJson = {
           url: `dat://${key}/`,
           title: document.getElementById('title').value,
@@ -123,19 +120,21 @@ function store (state, emitter) {
               console.error('Error writing to Dat', err)
               return
             }
-            console.log('Success.')
+            console.log(
+              `Published metadata ${prettyHash(archive.metadata.key)} ` +
+              `${archive.metadata.length} ` +
+              `content ${prettyHash(archive.content.key)} ` +
+              `${archive.content.length}`
+            )
             state.currentArchive = archive
-            multicore.replicateFeed(archive)
+            // multicore.replicateFeed(archive)
             emitter.emit('pushState', `/page/${key}`)
           })
         })
       })
     })
 
-    emitter.on('navigate', () => {
-      console.log('Jim navigate', state)
-      updateDoc()
-    })
+    emitter.on('navigate', updateDoc)
     
     const host = document.location.host
     // const url = `wss://${host}/archiver/${archiverKey}`
@@ -144,8 +143,14 @@ function store (state, emitter) {
     pump(
       stream,
       multicore.archiver.replicate({encrypt: false}),
-      stream
+      stream,
+      err => {
+        console.log('Pipe finished', err)
+      }
     )
+    multicore.archiver.on('add', feed => {
+      multicore.replicateFeed(feed)
+    })
     multicore.archiver.on('add-archive', readMetadata)
     Object.keys(multicore.archiver.archives).forEach(dk => {
       const archive = multicore.archiver.archives[dk]
@@ -155,17 +160,18 @@ function store (state, emitter) {
     
     function updateDoc () {
       if (!state.params.key) {
-        console.log('Jim reset doc')
         state.title = 'My Dat Page'
         state.indexHtml = template
         state.currentArchive = null
         emitter.emit('render')
       } else {
         const key = state.params.key
+        /*
         if (
           state.currentArchive &&
           state.currentArchive.key.toString('hex') === key
         ) return
+        */
         let archive
         if (state.archives[key] && state.archives[key].archive) {
           archive = state.archives[key].archive
@@ -175,7 +181,9 @@ function store (state, emitter) {
                         .toString('hex')
           if (multicore.archiver.archives[dk]) {
             archive = multicore.archiver.getHyperdrive(dk)
-            state.archives[key].dk = dk
+            if (!state.archives[key]) {
+              state.archives[key] = {dk}
+            }
             state.archives[key].archive = archive
             console.log('Key found (loaded)', key)
           } else {
@@ -204,7 +212,9 @@ function store (state, emitter) {
     function readMetadata (metadata) {
       const key = metadata.key.toString('hex')
       const dk = metadata.discoveryKey.toString('hex')
-      state.archives[key] = {dk}
+      if (!state.archives[key]) {
+        state.archives[key] = {dk}
+      }
       emitter.emit('render')
       let archive
       if (state.archives[key].archive) {
