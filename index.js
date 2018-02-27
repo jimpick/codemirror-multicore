@@ -127,7 +127,7 @@ function store (state, emitter) {
               `${archive.content.length}`
             )
             state.currentArchive = archive
-            // multicore.replicateFeed(archive)
+            multicore.replicateFeed(archive)
             emitter.emit('pushState', `/page/${key}`)
           })
         })

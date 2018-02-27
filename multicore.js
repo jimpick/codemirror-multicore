@@ -96,7 +96,7 @@ Archiver.prototype.createArchive = function (key, opts) {
     this.archives[dk].contentSynced = true
     this.archives[dk].content = archive.content
     metadata.emit('_archive')
-    this.emit('add-archive', metadata, content)
+    this.emit('add-archive', metadata, archive.content)
 
     this.changes.append({type: 'add', key: key.toString('hex')})
   })
