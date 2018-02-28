@@ -115,7 +115,7 @@ Archiver.prototype.createArchive = function (key, opts) {
 }
 
 Archiver.prototype.getHyperdrive = function (dk) {
-  console.log('Jim getHyperdrive', dk)
+  // console.log('Jim getHyperdrive', dk)
   if (!this.archives[dk]) return null
   const self = this
   const {metadata, content} = this.archives[dk]
@@ -131,17 +131,17 @@ Archiver.prototype.getHyperdrive = function (dk) {
   }
   const contentDk = hypercore.discoveryKey(contentKeys.publicKey)
                       .toString('hex')
-  archive = new hyperdrive(storage, metadata.key, options)
+  const archive = new hyperdrive(storage, metadata.key, options)
   if (content) {
     archive.key = archive.metadata.key
     archive.discoveryKey = archive.metadata.discoveryKey
   }
   archive.ready(() => {
     archive.content.on('append', () => {
-      console.log('Jim content append', archive.content.length)
+      // console.log('Jim content append', archive.content.length)
     })
     archive.content.on('peer-add', peer => {
-      console.log('Jim content peer-add', peer)
+      // console.log('Jim content peer-add', peer)
     })
   })
   return archive
@@ -174,35 +174,35 @@ Archiver.prototype.replicate = function (opts) {
   if (opts.userData) {
     protocolOpts.userData = opts.userData
   }
-  console.log('New replication stream')
+  // console.log('New replication stream')
   var stream = protocol(protocolOpts)
   var self = this
 
-  const added = new Set()
+  // const added = new Set()
 
   stream.on('feed', dk => {
-    console.log('Protocol feed event:', dk.toString('hex'))
+    // console.log('Protocol feed event:', dk.toString('hex'))
     add(dk)
   })
 
   if (opts.channel || opts.discoveryKey) {
     const dk = opts.channel || opts.discoveryKey
-    console.log('Options channel/dk:', dk.toString('hex'))
+    // console.log('Options channel/dk:', dk.toString('hex'))
     add(dk)
   }
 
   this.on('replicateFeed', feed => {
     const dk = feed.discoveryKey
-    console.log('Replicate feed event:', dk.toString('hex'))
+    // console.log('Replicate feed event:', prettyHash(feed.key), 'dk:', prettyHash(dk))
     add(dk)
   })
 
   function add (dk) {
     const hex = dk.toString('hex')
-    if (added.has(hex)) return
-    added.add(hex)
+    // if (added.has(hex)) return
+    // added.add(hex)
     self.ready(function (err) {
-      console.log('Add dk', dk.toString('hex'))
+      // console.log('Add dk', dk.toString('hex'))
       if (err) return stream.destroy(err)
       if (stream.destroyed) return
 
@@ -219,8 +219,8 @@ Archiver.prototype.replicate = function (opts) {
           stream: stream,
           live: true
         })
-        console.log('Jim replicate content',
-          prettyHash(archive.content.key))
+        // console.log('Jim replicate content',
+        //   prettyHash(archive.content.key))
         archive.content.replicate({
           stream: stream,
           live: true
@@ -228,8 +228,8 @@ Archiver.prototype.replicate = function (opts) {
       }
 
       function onfeed () {
-        console.log('Jim onfeed', prettyHash(feed.key),
-                     'dk:', prettyHash(feed.discoveryKey))
+        // console.log('Jim onfeed', prettyHash(feed.key),
+        //             'dk:', prettyHash(feed.discoveryKey))
         if (stream.destroyed) return
 
         stream.on('close', onclose)
@@ -250,8 +250,8 @@ Archiver.prototype.replicate = function (opts) {
           if (stream.destroyed) return
 
           var content = self.archives[hex].content
-          console.log('Jim onfeed replicate content',
-            prettyHash(content.key))
+          // console.log('Jim onfeed replicate content',
+          //   prettyHash(content.key))
           content.replicate({
             stream: stream,
             live: true

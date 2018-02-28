@@ -7,12 +7,20 @@ const through2 = require('through2')
 const ram = require('random-access-memory')
 const toBuffer = require('to-buffer')
 const hypercore = require('hypercore')
+const hyperdiscovery = require('hyperdiscovery')
 const sheetify = require('sheetify')
 const brfs = require('brfs')
 const prettyHash = require('pretty-hash')
 const Multicore = require('./multicore')
 
 require('events').prototype._maxListeners = 100
+
+// Run a cloud peer using pixelpusherd
+// https://github.com/automerge/pixelpusherd
+
+const defaultCloudPeers = [
+  'db26829a97db4a3f30b189357fab79c10c543c8e0a65a9d594eb3cb15e8aba1d'
+]
 
 const router = express.Router()
 
@@ -30,14 +38,14 @@ function attachWebsocket (server) {
   })
 
   router.ws('/archiver/:key', (ws, req) => {
-    const key = req.params.key
-    console.log('Websocket initiated for', key)
+    const archiverKey = req.params.key
+    console.log('Websocket initiated for', archiverKey)
     let multicore
-    if (multicores[key]) {
-      multicore = multicores[key]
+    if (multicores[archiverKey]) {
+      multicore = multicores[archiverKey]
     } else {
-      multicore = new Multicore(ram, {key})
-      multicores[key] = multicore
+      multicore = new Multicore(ram, {key: archiverKey})
+      multicores[archiverKey] = multicore
       const ar = multicore.archiver
       ar.on('add', feed => {
         console.log('archive add', feed.key.toString('hex'))
@@ -86,6 +94,8 @@ function attachWebsocket (server) {
         sw.on('connection', (peer, info) => {
           console.log('Swarm connection', info)
         })
+        // Connect cloud peers
+        connectCloudPeers(archiverKey)
       })
     }
     const ar = multicore.archiver
@@ -106,7 +116,7 @@ function attachWebsocket (server) {
         }),
         stream,
         err => {
-          console.log('pipe finished', err)
+          console.log('pipe finished', err.message)
         }
       )
       console.log(
@@ -114,6 +124,42 @@ function attachWebsocket (server) {
         ar.changes.discoveryKey.toString('hex')
       )
       multicore.replicateFeed(ar.changes)
+    })
+  })
+}
+
+function connectCloudPeers(archiverKey) {
+  const cloudPeers = defaultCloudPeers.reduce((acc, key) => {
+    acc[key] = {}
+    return acc
+  }, {})
+  Object.keys(cloudPeers).forEach(key => {
+    console.log('Cloud peer connecting...', key)
+    const feed = hypercore(ram, key)
+    feed.ready(() => {
+      // FIXME: We should encrypt this
+      const userData = JSON.stringify({key: archiverKey})
+      const sw = hyperdiscovery(feed, {
+        stream: () => feed.replicate({userData})
+      })
+      sw.on('connection', peer => {
+        console.log('Connected to cloud peer', key)
+        let name
+        try {
+          if (peer.remoteUserData) {
+            const json = JSON.parse(peer.remoteUserData.toString())
+            name = json.name
+          }
+        } catch (e) {
+          console.log('Cloud peer JSON parse error')
+        }
+        peer.on('error', err => {
+          console.log('Cloud peer connection error', key, err)
+        })
+        peer.on('close', err => {
+          console.log('Cloud peer connection closed', key)
+        })
+      })
     })
   })
 }
@@ -132,5 +178,4 @@ devServer.on('connect', event => {
   console.log('Listening on', event.uri)
   attachWebsocket(event.server)
 })
-
 

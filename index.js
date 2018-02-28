@@ -97,11 +97,11 @@ function store (state, emitter) {
   const multicore = new Multicore(debugStorage)
   multicore.ready(() => {
     const archiverKey = multicore.archiver.changes.key.toString('hex')
+    console.log('Archiver key:', archiverKey)
 
     emitter.on('publish', () => {
       const archive = state.currentArchive ? state.currentArchive :
         multicore.createArchive()
-      console.log('Archiver key:', archiverKey)
       const value = editor.codemirror.getValue()
       archive.ready(() => {
         const key = archive.key.toString('hex')
@@ -121,10 +121,13 @@ function store (state, emitter) {
               return
             }
             console.log(
-              `Published metadata ${prettyHash(archive.metadata.key)} ` +
-              `${archive.metadata.length} ` +
+              `Published:\n` +
+              `metadata ${prettyHash(archive.metadata.key)} ` +
+              `dk: ${prettyHash(archive.metadata.discoveryKey)} ` +
+              `length: ${archive.metadata.length}\n` +
               `content ${prettyHash(archive.content.key)} ` +
-              `${archive.content.length}`
+              `dk: ${prettyHash(archive.content.discoveryKey)} ` +
+              `length: ${archive.content.length}`
             )
             state.currentArchive = archive
             multicore.replicateFeed(archive)
@@ -139,15 +142,22 @@ function store (state, emitter) {
     const host = document.location.host
     const proto = document.location.protocol === 'https:' ? 'wss' : 'ws'
     const url = `${proto}://${host}/archiver/${archiverKey}`
-    const stream = websocket(url)
-    pump(
-      stream,
-      multicore.archiver.replicate({encrypt: false}),
-      stream,
-      err => {
-        console.log('Pipe finished', err)
-      }
-    )
+    
+    function connectWebsocket () {
+      console.log('Connecting websocket', url)
+      const stream = websocket(url)
+      pump(
+        stream,
+        multicore.archiver.replicate({encrypt: false}),
+        stream,
+        err => {
+          console.log('Pipe finished', err.message)
+          connectWebsocket()
+        }
+      )
+    }
+    connectWebsocket()
+    
     multicore.archiver.on('add', feed => {
       multicore.replicateFeed(feed)
     })
@@ -188,8 +198,8 @@ function store (state, emitter) {
             console.log('Key found (loaded)', key)
           } else {
             console.error('Key not found locally', key)
-            // FIXME: Throw
-            return
+            // It might be better to display an error in the UI
+            emitter.emit('pushState', '/')
           }
         }
         readMetadata(archive.metadata)
@@ -225,7 +235,7 @@ function store (state, emitter) {
       }
       archive.readFile('dat.json', 'utf-8', (err, data) => {
         if (err) {
-          console.error('Error reading dat.json', key, err)
+          // console.error('Error reading dat.json', key, err)
           return
         }
         try {
