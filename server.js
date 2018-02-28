@@ -133,7 +133,6 @@ function connectCloudPeers(archiverKey) {
     acc[key] = {}
     return acc
   }, {})
-  console.log('Jim cloud peers', cloudPeers)
   Object.keys(cloudPeers).forEach(key => {
     console.log('Cloud peer connecting...', key)
     const feed = hypercore(ram, key)
