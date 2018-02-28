@@ -121,10 +121,13 @@ function store (state, emitter) {
               return
             }
             console.log(
-              `Published metadata ${prettyHash(archive.metadata.key)} ` +
-              `${archive.metadata.length} ` +
+              `Published:\n` +
+              `metadata ${prettyHash(archive.metadata.key)} ` +
+              `dk: ${prettyHash(archive.metadata.discoveryKey)} ` +
+              `length: ${archive.metadata.length}\n` +
               `content ${prettyHash(archive.content.key)} ` +
-              `${archive.content.length}`
+              `dk: ${prettyHash(archive.content.discoveryKey)} ` +
+              `length: ${archive.content.length}`
             )
             state.currentArchive = archive
             multicore.replicateFeed(archive)
@@ -195,8 +198,8 @@ function store (state, emitter) {
             console.log('Key found (loaded)', key)
           } else {
             console.error('Key not found locally', key)
-            // FIXME: Throw
-            return
+            // It might be better to display an error in the UI
+            emitter.emit('pushState', '/')
           }
         }
         readMetadata(archive.metadata)

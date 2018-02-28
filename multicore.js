@@ -178,7 +178,7 @@ Archiver.prototype.replicate = function (opts) {
   var stream = protocol(protocolOpts)
   var self = this
 
-  const added = new Set()
+  // const added = new Set()
 
   stream.on('feed', dk => {
     // console.log('Protocol feed event:', dk.toString('hex'))
@@ -193,14 +193,14 @@ Archiver.prototype.replicate = function (opts) {
 
   this.on('replicateFeed', feed => {
     const dk = feed.discoveryKey
-    // console.log('Replicate feed event:', dk.toString('hex'))
+    // console.log('Replicate feed event:', prettyHash(feed.key), 'dk:', prettyHash(dk))
     add(dk)
   })
 
   function add (dk) {
     const hex = dk.toString('hex')
-    if (added.has(hex)) return
-    added.add(hex)
+    // if (added.has(hex)) return
+    // added.add(hex)
     self.ready(function (err) {
       // console.log('Add dk', dk.toString('hex'))
       if (err) return stream.destroy(err)

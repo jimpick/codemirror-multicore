@@ -15,8 +15,11 @@ const Multicore = require('./multicore')
 
 require('events').prototype._maxListeners = 100
 
+// Run a cloud peer using pixelpusherd
+// https://github.com/automerge/pixelpusherd
+
 const defaultCloudPeers = [
-  '7c7ab4b686c78df04cb24634e544e22a8c4acdf852ffb19f8217e37919490ba3'
+  'db26829a97db4a3f30b189357fab79c10c543c8e0a65a9d594eb3cb15e8aba1d'
 ]
 
 const router = express.Router()
@@ -141,6 +144,7 @@ function connectCloudPeers(archiverKey) {
         stream: () => feed.replicate({userData})
       })
       sw.on('connection', peer => {
+        console.log('Connected to cloud peer', key)
         let name
         try {
           if (peer.remoteUserData) {
