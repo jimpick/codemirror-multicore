@@ -1,12 +1,11 @@
 const html = require('choo/html')
-const devtools = require('choo-devtools')
+// const devtools = require('choo-devtools')
 const choo = require('choo')
 const storage = require('random-access-idb')('codemirror-multicore')
 const websocket = require('websocket-stream')
 const pump = require('pump')
 const prettyHash = require('pretty-hash')
 const toBuffer = require('to-buffer')
-const hyperdrive = require('hyperdrive')
 const hypercore = require('hypercore')
 const Editor = require('./editor')
 const Multicore = require('./multicore')
@@ -15,7 +14,7 @@ const template = require('./template')
 require('events').prototype._maxListeners = 100
 
 const app = choo()
-app.use(devtools())
+// app.use(devtools())
 app.use(store)
 app.route('/', mainView)
 app.route('/page/:key', mainView)
@@ -25,22 +24,28 @@ const editor = new Editor()
 
 function mainView (state, emit) {
   let link = html`<span class="help">Edit the HTML below, then click on "Publish" to create a new web site!</span>`
-  if (state.currentArchive && state.currentArchive.metadata.key) {
-    const url = `dat://${state.currentArchive.metadata.key.toString('hex')}`
+  let webPageKey
+  if (state.currentArchive && state.currentArchive.key) {
+    webPageKey = state.currentArchive.key.toString('hex')
+    const url = `dat://${webPageKey}`
     link = html`<a href=${url}>${url}</a>`
   }
+  let found = false
   const optionList = Object.keys(state.archives).sort().map(key => {
     let label = prettyHash(key)
     const title = state.archives[key].title
     if (title) {
       label += ` ${title}`
     }
-    return html`<option value=${key}>${label}</option>`
+    const selected = webPageKey === key ? 'selected' : ''
+    if (selected) found = true
+    return html`<option value=${key} ${selected}>${label}</option>`
   })
   const optGroup = optionList.length > 0 ? html`
     <optgroup label="Load">
       ${optionList}
     </optgroup>` : null
+  const selectNew = found ? '' : 'selected'
   return html`
     <body>
       <h2>
@@ -48,7 +53,7 @@ function mainView (state, emit) {
       </h2>
       <header>
         <select name="docs" onchange=${selectPage}>
-          <option value="new">Create a new webpage...</option>
+          <option value="new" ${selectNew}>Create a new webpage...</option>
           ${optGroup}
         </select>
         <div class="title">
@@ -71,7 +76,11 @@ function mainView (state, emit) {
   
   function selectPage (e) {
     const key = e.target.value
-    emit('pushState', `/page/${key}`)
+    if (key === 'new') {
+      emit('pushState', `/`)
+    } else {
+      emit('pushState', `/page/${key}`)
+    }
   }
 }
 
@@ -81,24 +90,21 @@ function store (state, emitter) {
   state.indexHtml = ''
   state.title = ''
 
-  const multicore = new Multicore(storage)
+  function debugStorage (name) {
+    // console.log('debugStorage:', name)
+    return storage(name)
+  }
+  const multicore = new Multicore(debugStorage)
   multicore.ready(() => {
     const archiverKey = multicore.archiver.changes.key.toString('hex')
+    console.log('Archiver key:', archiverKey)
 
     emitter.on('publish', () => {
       const archive = state.currentArchive ? state.currentArchive :
         multicore.createArchive()
-      console.log('Archiver key:', archiverKey)
       const value = editor.codemirror.getValue()
       archive.ready(() => {
-        const key = archive.metadata.key.toString('hex')
-        console.log('Key:', key)
-        console.log('Secret Key:', archive.metadata.secretKey)
-        setTimeout(() => {
-          readSecretKey(archive.metadata.discoveryKey.toString('hex'), () => {
-            console.log('Jim publish secretKey read')
-          })
-        }, 2000)
+        const key = archive.key.toString('hex')
         const datJson = {
           url: `dat://${key}/`,
           title: document.getElementById('title').value,
@@ -114,28 +120,44 @@ function store (state, emitter) {
               console.error('Error writing to Dat', err)
               return
             }
-            console.log('Success.')
+            console.log(
+              `Published metadata ${prettyHash(archive.metadata.key)} ` +
+              `${archive.metadata.length} ` +
+              `content ${prettyHash(archive.content.key)} ` +
+              `${archive.content.length}`
+            )
             state.currentArchive = archive
+            multicore.replicateFeed(archive)
             emitter.emit('pushState', `/page/${key}`)
-            multicore.replicateFeed(archive.metadata)
           })
         })
       })
     })
 
-    emitter.on('navigate', () => {
-      console.log('Jim navigate', state)
-      updateDoc()
-    })
+    emitter.on('navigate', updateDoc)
     
     const host = document.location.host
-    const url = `wss://${host}/archiver/${archiverKey}`
-    const stream = websocket(url)
-    pump(
-      stream,
-      multicore.archiver.replicate({encrypt: false}),
-      stream
-    )
+    const proto = document.location.protocol === 'https:' ? 'wss' : 'ws'
+    const url = `${proto}://${host}/archiver/${archiverKey}`
+    
+    function connectWebsocket () {
+      console.log('Connecting websocket', url)
+      const stream = websocket(url)
+      pump(
+        stream,
+        multicore.archiver.replicate({encrypt: false}),
+        stream,
+        err => {
+          console.log('Pipe finished', err.message)
+          connectWebsocket()
+        }
+      )
+    }
+    connectWebsocket()
+    
+    multicore.archiver.on('add', feed => {
+      multicore.replicateFeed(feed)
+    })
     multicore.archiver.on('add-archive', readMetadata)
     Object.keys(multicore.archiver.archives).forEach(dk => {
       const archive = multicore.archiver.archives[dk]
@@ -145,30 +167,30 @@ function store (state, emitter) {
     
     function updateDoc () {
       if (!state.params.key) {
-        console.log('Jim reset doc')
         state.title = 'My Dat Page'
         state.indexHtml = template
+        state.currentArchive = null
         emitter.emit('render')
       } else {
         const key = state.params.key
-        if (state.currentArchive && state.currentArchive.metadata.key.toString('hex') === key) return
+        /*
+        if (
+          state.currentArchive &&
+          state.currentArchive.key.toString('hex') === key
+        ) return
+        */
         let archive
         if (state.archives[key] && state.archives[key].archive) {
           archive = state.archives[key].archive
           console.log('Key found (cached)', key)
         } else {
-          const dk = hypercore.discoveryKey(toBuffer(key, 'hex')).toString('hex')
+          const dk = hypercore.discoveryKey(toBuffer(key, 'hex'))
+                        .toString('hex')
           if (multicore.archiver.archives[dk]) {
-            const {metadata, content} = multicore.archiver.archives[dk]
-            readSecretKey(dk, () => { console.log('Jim read secret key done.') })
-            const options = {
-              metadata,
-              content,
-              sparse: true,
-              sparseMetadata: true
+            archive = multicore.archiver.getHyperdrive(dk)
+            if (!state.archives[key]) {
+              state.archives[key] = {dk}
             }
-            archive = new hyperdrive(null, key, options)
-            state.archives[key].dk = dk
             state.archives[key].archive = archive
             console.log('Key found (loaded)', key)
           } else {
@@ -177,6 +199,7 @@ function store (state, emitter) {
             return
           }
         }
+        readMetadata(archive.metadata)
         archive.readFile('index.html', 'utf-8', (err, data) => {
           if (err) {
             console.error('Error reading index.html', key, err)
@@ -192,31 +215,24 @@ function store (state, emitter) {
         })
       }
     }
-    
-    function readMetadata (metadata, content) {
+
+    function readMetadata (metadata) {
       const key = metadata.key.toString('hex')
       const dk = metadata.discoveryKey.toString('hex')
-      state.archives[key] = {
-        dk
+      if (!state.archives[key]) {
+        state.archives[key] = {dk}
       }
       emitter.emit('render')
       let archive
       if (state.archives[key].archive) {
         archive = state.archives[key].archive
       } else {
-        readSecretKey(dk, () => { console.log('Jim read secret key done.') })
-        const options = {
-          metadata,
-          content,
-          sparse: true,
-          sparseMetadata: true
-        }
-        archive = new hyperdrive(null, key, options)
+        archive = multicore.archiver.getHyperdrive(dk)
         state.archives[key].archive = archive
       }
       archive.readFile('dat.json', 'utf-8', (err, data) => {
         if (err) {
-          console.error('Error reading dat.json', key, err)
+          // console.error('Error reading dat.json', key, err)
           return
         }
         try {
@@ -227,20 +243,6 @@ function store (state, emitter) {
         } catch(e) {
           // Don't worry about it
         }
-      })
-    }
-    
-    function readSecretKey (dk, cb) {
-      // const path = 'feeds/' + dk.slice(0, 2) + '/' + dk.slice(2, 4) + '/' + dk.slice(4) + '/secret_key'
-      const path = 'feeds/' + dk.slice(0, 2) + '/' + dk.slice(2, 4) + '/' + dk.slice(4) + '/metadata/secret_key'
-      const privateKeyFile = storage(path)
-      privateKeyFile.read(0, 64, (err, data) => {
-        if (err) {
-          console.error('readSecretKey error', path, err)
-          return cb(err)
-        }
-        console.log('Jim secret key', data)
-        cb(null, data)
       })
     }
   })

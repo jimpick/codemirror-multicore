@@ -1,100 +1,178 @@
-const browserify = require('browserify-middleware')
+const budo = require('budo')
 const express = require('express')
 const expressWebSocket = require('express-ws')
 const websocketStream = require('websocket-stream/stream')
 const pump = require('pump')
 const through2 = require('through2')
-// const hypercore = require('hypercore')
 const ram = require('random-access-memory')
 const toBuffer = require('to-buffer')
 const hypercore = require('hypercore')
-const Multicore = require('./script/multicore')
+const hyperdiscovery = require('hyperdiscovery')
+const sheetify = require('sheetify')
+const brfs = require('brfs')
+const prettyHash = require('pretty-hash')
+const Multicore = require('./multicore')
 
 require('events').prototype._maxListeners = 100
 
-const app = express()
+const defaultCloudPeers = [
+  '7c7ab4b686c78df04cb24634e544e22a8c4acdf852ffb19f8217e37919490ba3'
+]
 
-app.use('/js', browserify(__dirname + '/script', {
-  transform: ['sheetify']
-}))
-app.get('/page/:key', (_, res) => res.sendFile(`${__dirname}/public/index.html`))
-app.use(express.static(__dirname + '/public'))
+const router = express.Router()
 
-expressWebSocket(app, null, {
-  perMessageDeflate: false
+router.get('/page/:key', (req, res, next) => {
+  req.url = '/index.html'
+  next()
 })
 
 const multicores = {}
 
-app.ws('/archiver/:key', (ws, req) => {
-  const key = req.params.key
-  console.log('Websocket initiated for', key)
-  let multicore
-  if (multicores[key]) {
-    multicore = multicores[key]
-  } else {
-    multicore = new Multicore(ram, {key})
-    multicores[key] = multicore
+function attachWebsocket (server) {
+  console.log('Attaching websocket')
+  expressWebSocket(router, server, {
+    perMessageDeflate: false
+  })
+
+  router.ws('/archiver/:key', (ws, req) => {
+    const archiverKey = req.params.key
+    console.log('Websocket initiated for', archiverKey)
+    let multicore
+    if (multicores[archiverKey]) {
+      multicore = multicores[archiverKey]
+    } else {
+      multicore = new Multicore(ram, {key: archiverKey})
+      multicores[archiverKey] = multicore
+      const ar = multicore.archiver
+      ar.on('add', feed => {
+        console.log('archive add', feed.key.toString('hex'))
+        multicore.replicateFeed(feed)
+        feed.on('append', () => {
+          console.log('append', prettyHash(feed.key), feed.length)
+        })
+        feed.on('sync', () => {
+          console.log('sync', prettyHash(feed.key), feed.length)
+        })
+      })
+      ar.on('add-archive', (metadata, content) => {
+        console.log(
+          'archive add-archive',
+          metadata.key.toString('hex'),
+          content.key.toString('hex')
+        )
+        content.on('append', () => {
+          console.log(
+            'append content',
+            prettyHash(content.key),
+            content.length
+          )
+        })
+        content.on('sync', () => {
+          console.log(
+            'sync content',
+            prettyHash(content.key),
+            content.length
+          )
+        })
+      })
+      ar.on('sync', feed => {
+        console.log('archive fully synced', prettyHash(feed.key))
+      })
+      ar.on('ready', () => {
+        console.log('archive ready', ar.changes.length)
+        ar.changes.on('append', () => {
+          console.log('archive changes append', ar.changes.length)
+        })
+        ar.changes.on('sync', () => {
+          console.log('archive changes sync', ar.changes.length)
+        })
+        // Join swarm
+        const sw = multicore.joinSwarm()
+        sw.on('connection', (peer, info) => {
+          console.log('Swarm connection', info)
+        })
+        // Connect cloud peers
+        connectCloudPeers(archiverKey)
+      })
+    }
     const ar = multicore.archiver
-    ar.on('add', feed => {
-      console.log('archive add', feed.key.toString('hex'))
-      multicore.replicateFeed(feed)
+    ar.ready(() => {
+      const stream = websocketStream(ws)
+      pump(
+        stream,
+        through2(function (chunk, enc, cb) {
+          // console.log('From web', chunk)
+          this.push(chunk)
+          cb()
+        }),
+        ar.replicate({encrypt: false}),
+        through2(function (chunk, enc, cb) {
+          // console.log('To web', chunk)
+          this.push(chunk)
+          cb()
+        }),
+        stream,
+        err => {
+          console.log('pipe finished', err.message)
+        }
+      )
+      console.log(
+        'Changes feed dk:',
+        ar.changes.discoveryKey.toString('hex')
+      )
+      multicore.replicateFeed(ar.changes)
     })
-    ar.on('sync', () => {
-      console.log('archive sync')
-    })
-    ar.on('ready', () => {
-      console.log('archive ready', ar.changes.length)
-      ar.changes.on('append', () => {
-        console.log('archive changes append', ar.changes.length)
+  })
+}
+
+function connectCloudPeers(archiverKey) {
+  const cloudPeers = defaultCloudPeers.reduce((acc, key) => {
+    acc[key] = {}
+    return acc
+  }, {})
+  console.log('Jim cloud peers', cloudPeers)
+  Object.keys(cloudPeers).forEach(key => {
+    console.log('Cloud peer connecting...', key)
+    const feed = hypercore(ram, key)
+    feed.ready(() => {
+      // FIXME: We should encrypt this
+      const userData = JSON.stringify({key: archiverKey})
+      const sw = hyperdiscovery(feed, {
+        stream: () => feed.replicate({userData})
       })
-      ar.changes.on('sync', () => {
-        console.log('archive changes sync', ar.changes.length)
-      })
-      // Join swarm
-      const sw = multicore.joinSwarm()
-      sw.on('connection', (peer, type) => {
-        /*
+      sw.on('connection', peer => {
+        let name
         try {
-          if (!peer.remoteUserData) throw new Error('No user data')
-          const userData = JSON.parse(peer.remoteUserData.toString())
-          if (userData.key) {
-            console.log(`Connect ${userData.name} ${userData.key}`)
-            const dk = hypercore.discoveryKey(toBuffer(userData.key, 'hex'))
-            multicore.archiver.add(dk)
-            multicore.announceActor(userData.name, userData.key)
+          if (peer.remoteUserData) {
+            const json = JSON.parse(peer.remoteUserData.toString())
+            name = json.name
           }
         } catch (e) {
-          console.log(`Connection with no or invalid user data`, e)
-          // console.error('Error parsing JSON', e)
+          console.log('Cloud peer JSON parse error')
         }
-        */
+        peer.on('error', err => {
+          console.log('Cloud peer connection error', key, err)
+        })
+        peer.on('close', err => {
+          console.log('Cloud peer connection closed', key)
+        })
       })
     })
-  }
-  const ar = multicore.archiver
-  ar.ready(() => {
-    const stream = websocketStream(ws)
-    pump(
-      stream,
-      through2(function (chunk, enc, cb) {
-        // console.log('From web', chunk)
-        this.push(chunk)
-        cb()
-      }),
-      ar.replicate({encrypt: false}),
-      through2(function (chunk, enc, cb) {
-        // console.log('To web', chunk)
-        this.push(chunk)
-        cb()
-      }),
-      stream
-    )
-    multicore.replicateFeed(ar.changes)
   })
-})
+}
 
-const listener = app.listen(process.env.PORT, () => {
-  console.log('Listening on port', listener.address().port)
+const port = process.env.PORT || 5000
+const devServer = budo('index.js', {
+  port,
+  browserify: {
+    transform: [ brfs, sheetify ]
+  },
+  middleware: [
+    router
+  ]
+})
+devServer.on('connect', event => {
+  console.log('Listening on', event.uri)
+  attachWebsocket(event.server)
 })
 
