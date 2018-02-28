@@ -137,8 +137,8 @@ function store (state, emitter) {
     emitter.on('navigate', updateDoc)
     
     const host = document.location.host
-    // const url = `wss://${host}/archiver/${archiverKey}`
-    const url = `ws://${host}/archiver/${archiverKey}`
+    const proto = document.location.protocol === 'https:' ? 'wss' : 'ws'
+    const url = `${proto}://${host}/archiver/${archiverKey}`
     const stream = websocket(url)
     pump(
       stream,
