@@ -11,7 +11,7 @@ body {
 header {
   display: grid;
   grid: repeat(4, 1fr) / repeat(4, 1fr);
-  flex: 1;
+  flex: 0;
   grid-gap: 0.3em;
   margin-bottom: 0.3em;
 }
@@ -78,6 +78,7 @@ h2 {
   height: 100%;
   width: 100%;
   overflow: auto;
+  flex: 1;
 }
 
 #editor .CodeMirror {
@@ -86,5 +87,26 @@ h2 {
 }
 
 footer {
-  margin-top: 0.3em;
+  margin-top: 0.2em;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+footer > * {
+  margin: 0.1em;
+}
+
+footer > a {
+  margin-right: 0.2em;
+}
+
+footer #more {
+  justify-self: end;
+  width: 7em;
+  margin-left: auto;
+}
+
+.github-button {
+  opacity: 0;
 }
