@@ -2,7 +2,7 @@
 
 An experiment to see if it's possible to create Dat web pages from the old web.
 
-https://codemirror-multicore.glitch.me/
+[https://codemirror-multicore.glitch.me/](https://codemirror-multicore.glitch.me/)
 
 # Deploy to Glitch
 
