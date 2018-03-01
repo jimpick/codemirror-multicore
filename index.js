@@ -69,7 +69,10 @@ function mainView (state, emit) {
       </header>
       ${editor.render(state.indexHtml)}
       <footer>
-        Edit this on <a href="https://glitch.com/edit/#!/codemirror-multicore">Glitch</a>
+        <a href="https://glitch.com/edit/#!/remix/codemirror-multicore">
+          <img src="https://cdn.glitch.com/2703baf2-b643-4da7-ab91-7ee2a2d00b5b%2Fremix-button.svg"
+                alt="Remix on Glitch" />
+        </a>
       </footer>
     </body>
   `
