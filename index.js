@@ -76,7 +76,7 @@ function mainView (state, emit) {
       </footer>
     </body>
   `
-  
+
   function selectPage (e) {
     const key = e.target.value
     if (key === 'new') {
@@ -103,8 +103,8 @@ function store (state, emitter) {
     console.log('Archiver key:', archiverKey)
 
     emitter.on('publish', () => {
-      const archive = state.currentArchive ? state.currentArchive :
-        multicore.createArchive()
+      const archive = state.currentArchive ? state.currentArchive
+        : multicore.createArchive()
       const value = editor.codemirror.getValue()
       archive.ready(() => {
         const key = archive.key.toString('hex')
@@ -141,11 +141,11 @@ function store (state, emitter) {
     })
 
     emitter.on('navigate', updateDoc)
-    
+
     const host = document.location.host
     const proto = document.location.protocol === 'https:' ? 'wss' : 'ws'
     const url = `${proto}://${host}/archiver/${archiverKey}`
-    
+
     function connectWebsocket () {
       console.log('Connecting websocket', url)
       const stream = websocket(url)
@@ -160,7 +160,7 @@ function store (state, emitter) {
       )
     }
     connectWebsocket()
-    
+
     multicore.archiver.on('add', feed => {
       multicore.replicateFeed(feed)
     })
@@ -170,7 +170,7 @@ function store (state, emitter) {
       readMetadata(archive.metadata, archive.content)
     })
     updateDoc()
-    
+
     function updateDoc () {
       if (!state.params.key) {
         state.title = 'My Dat Page'
@@ -191,7 +191,7 @@ function store (state, emitter) {
           console.log('Key found (cached)', key)
         } else {
           const dk = hypercore.discoveryKey(toBuffer(key, 'hex'))
-                        .toString('hex')
+            .toString('hex')
           if (multicore.archiver.archives[dk]) {
             archive = multicore.archiver.getHyperdrive(dk)
             if (!state.archives[key]) {
@@ -215,7 +215,7 @@ function store (state, emitter) {
             state.indexHtml = data
             state.currentArchive = archive
             emitter.emit('render')
-          } catch(e) {
+          } catch (e) {
             // FIXME: Throw an error to the UI
           }
         })
@@ -246,13 +246,10 @@ function store (state, emitter) {
           state.archives[key].title = title
           if (state.params.key === key) state.title = title
           emitter.emit('render')
-        } catch(e) {
+        } catch (e) {
           // Don't worry about it
         }
       })
     }
   })
 }
-
-
-

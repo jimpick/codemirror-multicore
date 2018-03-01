@@ -5,7 +5,6 @@ const websocketStream = require('websocket-stream/stream')
 const pump = require('pump')
 const through2 = require('through2')
 const ram = require('random-access-memory')
-const toBuffer = require('to-buffer')
 const hypercore = require('hypercore')
 const hyperdiscovery = require('hyperdiscovery')
 const sheetify = require('sheetify')
@@ -128,7 +127,7 @@ function attachWebsocket (server) {
   })
 }
 
-function connectCloudPeers(archiverKey) {
+function connectCloudPeers (archiverKey) {
   const cloudPeers = defaultCloudPeers.reduce((acc, key) => {
     acc[key] = {}
     return acc
@@ -143,21 +142,24 @@ function connectCloudPeers(archiverKey) {
         stream: () => feed.replicate({userData})
       })
       sw.on('connection', peer => {
-        console.log('Connected to cloud peer', key)
+        // FIXME: Getting a lot of repeat connections from non-cloud peers
         let name
         try {
           if (peer.remoteUserData) {
             const json = JSON.parse(peer.remoteUserData.toString())
             name = json.name
+            if (name) {
+              console.log('Connected to cloud peer', key, name)
+            }
           }
         } catch (e) {
           console.log('Cloud peer JSON parse error')
         }
         peer.on('error', err => {
-          console.log('Cloud peer connection error', key, err)
+          console.log('Cloud peer connection error', key, err.message)
         })
         peer.on('close', err => {
-          console.log('Cloud peer connection closed', key)
+          console.log('Cloud peer connection closed', key, err.message)
         })
       })
     })
@@ -178,4 +180,3 @@ devServer.on('connect', event => {
   console.log('Listening on', event.uri)
   attachWebsocket(event.server)
 })
-

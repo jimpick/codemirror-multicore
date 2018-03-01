@@ -16,7 +16,7 @@ class Editor extends Nanocomponent {
     this.indexHtml = indexHtml
     return html`<div id="editor"></div>`
   }
-  
+
   load (el) {
     this.codemirror = CodeMirror(el, {
       lineNumbers: true,
