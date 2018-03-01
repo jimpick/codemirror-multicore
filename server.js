@@ -153,10 +153,10 @@ function connectCloudPeers (archiverKey) {
           console.log('Cloud peer JSON parse error')
         }
         peer.on('error', err => {
-          console.log('Cloud peer connection error', key, err.message)
+          console.log('Cloud peer connection error', key, err)
         })
         peer.on('close', err => {
-          console.log('Cloud peer connection closed', key, err.message)
+          console.log('Cloud peer connection closed', key, err)
         })
       })
     })
