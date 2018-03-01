@@ -142,15 +142,12 @@ function connectCloudPeers (archiverKey) {
         stream: () => feed.replicate({userData})
       })
       sw.on('connection', peer => {
-        // FIXME: Getting a lot of repeat connections from non-cloud peers
         let name
         try {
           if (peer.remoteUserData) {
             const json = JSON.parse(peer.remoteUserData.toString())
             name = json.name
-            if (name) {
-              console.log('Connected to cloud peer', key, name)
-            }
+            console.log('Connected to cloud peer', key, name)
           }
         } catch (e) {
           console.log('Cloud peer JSON parse error')
