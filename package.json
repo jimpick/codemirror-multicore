@@ -22,6 +22,7 @@
     "random-access-idb": "^1.0.4",
     "random-access-memory": "^2.4.0",
     "sheetify": "^7.2.0",
+    "sodium-javascript": "jimpick/sodium-javascript",
     "to-buffer": "^1.1.0",
     "websocket-stream": "^5.1.1"
   },

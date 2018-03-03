@@ -118,7 +118,6 @@ function mainView (state, emit) {
         const secretKey = state.currentArchive.metadata.secretKey.toString('hex')
         console.log('Export', webPageKey, secretKey)
         alert(
-          '*** ALERT: These instructions do not work yet due to a bug in the crypto library ***\n\n' +
           'You can export the data and the secret key to the command-line ' +
           'dat tool. First, you need to clone the data:\n\n' +
           `dat clone dat://${webPageKey}\n\n` +
