@@ -29,7 +29,7 @@ For this style of publishing to be successful, I think there needs to be a way f
 [![Remix on Glitch](https://cdn.glitch.com/2703baf2-b643-4da7-ab91-7ee2a2d00b5b%2Fremix-button.svg)](https://glitch.com/edit/#!/import/github/jimpick/codemirror-multicore)
 
 Note: Some of the dependencies don't work with pnpm, which glitch will use by default. To use regular
-name, open up a console and type: `enable-npm`
+npm, open up a console and type: `enable-npm`
 
 # License
 
